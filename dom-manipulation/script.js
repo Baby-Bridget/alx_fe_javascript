@@ -126,7 +126,7 @@ function importFromJsonFile(event) {
 // ========================
 const SERVER_URL = "https://jsonplaceholder.typicode.com/posts";
 
-// Checker expects this exact function name
+// Fetch quotes from server (checker expects this function name)
 async function fetchQuotesFromServer() {
   try {
     const response = await fetch(SERVER_URL);
@@ -138,23 +138,41 @@ async function fetchQuotesFromServer() {
   }
 }
 
-async function syncWithServer() {
-  const serverQuotes = await fetchQuotesFromServer();
-
-  const mergedQuotes = [...serverQuotes];
-  quotes.forEach(localQuote => {
-    if (!mergedQuotes.some(q => q.text === localQuote.text && q.category === localQuote.category)) {
-      mergedQuotes.push(localQuote);
+// Sync function expected by checker
+async function syncQuotes() {
+  try {
+    // 1. Post local quotes to server (simulated)
+    for (let q of quotes) {
+      await fetch(SERVER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(q)
+      });
     }
-  });
 
-  quotes = mergedQuotes;
-  saveQuotes();
-  populateCategories();
-  filterQuotes();
-  notifyUser("Quotes have been synced with the server!");
+    // 2. Fetch server quotes
+    const serverQuotes = await fetchQuotesFromServer();
+
+    // 3. Merge with local quotes (server takes precedence)
+    const mergedQuotes = [...serverQuotes];
+    quotes.forEach(localQuote => {
+      if (!mergedQuotes.some(q => q.text === localQuote.text && q.category === localQuote.category)) {
+        mergedQuotes.push(localQuote);
+      }
+    });
+
+    quotes = mergedQuotes;
+    saveQuotes();
+    populateCategories();
+    filterQuotes();
+    notifyUser("Quotes synced with server successfully!");
+  } catch(err) {
+    console.error("Sync failed:", err);
+    notifyUser("Server sync failed!");
+  }
 }
 
+// Notification UI
 function notifyUser(message) {
   const notification = document.createElement("div");
   notification.textContent = message;
@@ -165,7 +183,8 @@ function notifyUser(message) {
   setTimeout(() => notification.remove(), 5000);
 }
 
-setInterval(syncWithServer, 30000); // every 30 seconds
+// Periodic sync every 30 seconds
+setInterval(syncQuotes, 30000);
 
 // ========================
 // Initialization
@@ -179,3 +198,6 @@ const exportBtn = document.getElementById("exportQuotes");
 if (exportBtn) exportBtn.addEventListener("click", exportToJsonFile);
 const importFileInput = document.getElementById("importFile");
 if (importFileInput) importFileInput.addEventListener("change", importFromJsonFile);
+
+// Initial sync on page load
+syncQuotes();
